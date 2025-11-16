@@ -5,11 +5,11 @@
   "keyFile": "./ssl/localhost.key",
   "backends": [
     {
-      "backend": "localhost:3001",
+      "backend": "example-insecure-service:3001",
       "filter": "/myinsecureapp.Greeter"
     },
     {
-      "backend": "localhost:3002",
+      "backend": "example-secure-service:3002",
       "filter": "/mysecureapp.",
       "certFile": "./ssl/localhost.pem",
       "serverName": "localhost"

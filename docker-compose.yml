@@ -1,0 +1,62 @@
+name: 'grpc-proxy'
+services:
+  'test':
+    build:
+      context: '.'
+      dockerfile: './Dockerfile'
+      target: 'test'
+  'proxy':
+    build:
+      context: '.'
+      dockerfile: './Dockerfile'
+      target: 'run-proxy'
+  'example-client':
+    container_name: 'example-client'
+    links:
+      - 'example-proxy'
+    build:
+      context: './examples/client-node/'
+      dockerfile: '../Dockerfile'
+      target: 'example-service'
+    secrets:
+      - source: 'example-credentials'
+        target: '/project/ssl/'
+  'example-insecure-service':
+    container_name: 'example-insecure-service'
+    build:
+      context: './examples/insecure-microservice-node/'
+      dockerfile: '../Dockerfile'
+      target: 'example-service'
+    secrets:
+      - source: 'example-credentials'
+        target: '/project/ssl/'
+  'example-secure-service':
+    container_name: 'example-secure-service'
+    build:
+      context: './examples/secure-microservice-node/'
+      dockerfile: '../Dockerfile'
+      target: 'example-service'
+    secrets:
+      - source: 'example-credentials'
+        target: '/project/ssl/'
+  'example-proxy':
+    container_name: 'example-proxy'
+    links:
+      - 'example-insecure-service'
+      - 'example-secure-service'
+    build:
+      context: '.'
+      dockerfile: './Dockerfile'
+      target: 'run-example-proxy'
+    volumes:
+      - type: 'bind'
+        source: './examples/config-insecure-proxy.json'
+        target: '/project/config-insecure-proxy.json'
+        read_only: true
+      - type: 'bind'
+        source: './examples/config-secure-proxy.json'
+        target: '/project/config-secure-proxy.json'
+        read_only: true
+secrets:
+  'example-credentials':
+    file: './examples/ssl/'

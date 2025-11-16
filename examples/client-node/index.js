@@ -1,18 +1,18 @@
 const caller = require('grpc-caller');
 const grpc = require('grpc');
-const fs = require('fs');
+const fs = require('node:fs');
 
 const cert = fs.readFileSync('../ssl/localhost.pem');
 const sslCreds = grpc.credentials.createSsl(cert);
 
 const clients = {
   'withInsecureProxy': {
-    'insecureMicroservice': caller('localhost:50051', '../insecure-microservice-node/hello.proto', 'Greeter'),
-    'secureMicroservice': caller('localhost:50051', '../secure-microservice-node/hello.proto', 'Greeter'),
+    'insecureMicroservice': caller('example-proxy:50051', '../insecure-microservice-node/hello.proto', 'Greeter'),
+    'secureMicroservice': caller('example-proxy:50051', '../secure-microservice-node/hello.proto', 'Greeter'),
   },
   'withSecureProxy': {
-    'insecureMicroservice': caller('localhost:50052', '../insecure-microservice-node/hello.proto', 'Greeter', sslCreds),
-    'secureMicroservice': caller('localhost:50052', '../secure-microservice-node/hello.proto', 'Greeter', sslCreds),
+    'insecureMicroservice': caller('example-proxy:50052', '../insecure-microservice-node/hello.proto', 'Greeter', sslCreds),
+    'secureMicroservice': caller('example-proxy:50052', '../secure-microservice-node/hello.proto', 'Greeter', sslCreds),
   },
 };
 

@@ -34,5 +34,18 @@ COPY --link --from=legal [ "./", "./" ]
 COPY --link --from=build-proxy [ "/project/grpc-proxy", "./" ]
 
 EXPOSE 50051
-
 ENTRYPOINT [ "/project/grpc-proxy" ]
+
+FROM run-proxy AS run-example-proxy
+
+WORKDIR /project/insecure-microservice-node/
+COPY [ "./examples/insecure-microservice-node/hello.proto", "./" ]
+
+WORKDIR /project/secure-microservice-node/
+COPY [ "./examples/secure-microservice-node/hello.proto", "./" ]
+
+WORKDIR /project/
+COPY --link [ "./examples/run-proxies.sh", "./" ]
+
+EXPOSE 50051 50052
+ENTRYPOINT [ "/project/run-proxies.sh" ]
