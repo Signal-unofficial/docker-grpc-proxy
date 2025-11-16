@@ -9,35 +9,44 @@ import (
   "github.com/mwitkow/grpc-proxy/proxy"
   "google.golang.org/grpc/credentials"
   "google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/metadata"
 )
 
-func GetDirector(config Config) func(context.Context, string) (*grpc.ClientConn, error) {
+func GetDirector(config Config) func(context.Context, string) (context.Context, grpc.ClientConnInterface, error) {
 
   credentialsCache := make(map[string] credentials.TransportCredentials)
 
-  return func(ctx context.Context, fullMethodName string) (*grpc.ClientConn, error) {
-    for _, backend := range config.Backends {
-      if strings.HasPrefix(fullMethodName, backend.Filter) {
-        if (config.Verbose) {
-          fmt.Printf("Found: %s > %s \n", fullMethodName, backend.Backend)
+  return func(ctx context.Context, fullMethodName string) (context.Context, grpc.ClientConnInterface, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+    if ok {
+      // Copy the inbound metadata explicitly.
+      outCtx := metadata.NewOutgoingContext(ctx, md.Copy())
+      // Decide on which backend to dial
+      for _, backend := range config.Backends {
+        if strings.HasPrefix(fullMethodName, backend.Filter) {
+          if (config.Verbose) {
+            fmt.Printf("Found: %s > %s \n", fullMethodName, backend.Backend)
+          }
+          if backend.CertFile == "" {
+            conn, err := grpc.DialContext(ctx, backend.Backend, grpc.WithCodec(proxy.Codec()),
+              grpc.WithInsecure())
+            return outCtx, conn, err
+          }
+          creds := GetCredentials(credentialsCache, backend)
+          if creds != nil {
+            conn, err := grpc.DialContext(ctx, backend.Backend, grpc.WithCodec(proxy.Codec()),
+              grpc.WithTransportCredentials(creds))
+            return outCtx, conn, err
+          }
+          grpclog.Fatalf("Failed to create TLS credentials")
+          return nil, nil, grpc.Errorf(codes.FailedPrecondition, "Backend TLS is not configured properly in grpc-proxy")
         }
-        if backend.CertFile == "" {
-          return grpc.DialContext(ctx, backend.Backend, grpc.WithCodec(proxy.Codec()),
-            grpc.WithInsecure())
-        }
-        creds := GetCredentials(credentialsCache, backend)
-        if creds != nil {
-          return grpc.DialContext(ctx, backend.Backend, grpc.WithCodec(proxy.Codec()),
-            grpc.WithTransportCredentials(creds))
-        }
-        grpclog.Fatalf("Failed to create TLS credentials")
-        return nil, grpc.Errorf(codes.FailedPrecondition, "Backend TLS is not configured properly in grpc-proxy")
+      }
+      if (config.Verbose) {
+        fmt.Println("Not found: ", fullMethodName)
       }
     }
-    if (config.Verbose) {
-      fmt.Println("Not found: ", fullMethodName)
-    }
-    return nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
+    return nil, nil, grpc.Errorf(codes.Unimplemented, "Unknown method")
   }
 }
 

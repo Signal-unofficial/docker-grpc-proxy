@@ -39,5 +39,5 @@ Examples on how to use the gRPC proxy service.
 
 ## Why are the microservices in Node?
 
-I had them at hand ready to use. Send me a PR with examples in Go.
+I had them on hand ready to use. Send me a PR with examples in Go.
 They should be easy to implement, and I'll be happy to merge them.

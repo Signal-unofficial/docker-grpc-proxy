@@ -1,0 +1,24 @@
+{
+  "name": "grpc-proxy_",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "description": "A runnable, configurable Go reverse proxy that allows for rich routing of gRPC calls with minimum overhead.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Signal-unofficial/docker-grpc-proxy.git",
+    "directory": "examples"
+  },
+  "bugs": {
+    "url": "https://github.com/Signal-unofficial/docker-grpc-proxy/issues"
+  },
+  "homepage": "https://github.com/Signal-unofficial/docker-grpc-proxy#readme",
+  "workspaces": [
+    "./client-node",
+    "./insecure-microservice-node",
+    "./secure-microservice-node"
+  ]
+}
