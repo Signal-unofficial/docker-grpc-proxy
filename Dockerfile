@@ -1,11 +1,24 @@
 ARG GO_VERSION=golang:1.24.0-alpine
 ARG ALPINE_VERSION=alpine@sha256:4b7ce07002c69e8f3d704a9c5d6fd3053be500b7f1c69fc0d80990c2ad8dd412
 
-FROM ${GO_VERSION} AS build
+FROM scratch AS legal
 
 WORKDIR /project/
-COPY --link [ "./LICENSE", "./" ]
+COPY --link [ "./LICENSE","./" ]
+
+FROM ${GO_VERSION} AS test
+
+WORKDIR /project/
 COPY [ "./", "./" ]
+
+ENTRYPOINT [ "go", "test" ]
+CMD [ "./..." ]
+
+FROM ${GO_VERSION} AS build-proxy
+
+WORKDIR /project/
+COPY --link --from=legal [ "./", "./" ]
+COPY --exclude="./examples" [ "./", "./" ]
 
 RUN apk add --no-cache git \
     && go build \
@@ -14,9 +27,12 @@ RUN apk add --no-cache git \
 
 ENTRYPOINT [ "/project/grpc-proxy" ]
 
-FROM ${ALPINE_VERSION} AS run
+FROM ${ALPINE_VERSION} AS run-proxy
 
 WORKDIR /project/
-COPY --from=build [ "/project/grpc-proxy", "./" ]
+COPY --link --from=legal [ "./", "./" ]
+COPY --link --from=build-proxy [ "/project/grpc-proxy", "./" ]
+
+EXPOSE 50051
 
 ENTRYPOINT [ "/project/grpc-proxy" ]
