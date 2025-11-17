@@ -1,10 +1,71 @@
-ARG NODE_VERSION=node:lts-bookworm-slim@sha256:f752e4821362614eab35016f01dea3af61d2f59d0445381c25683e4331520a7b
+# Ubuntu Noble standard support reaches EOL in April 2029
+# https://ubuntu.com/about/release-cycle
+ARG BASE_IMAGE=ubuntu:noble-20250910@sha256:985be7c735afdf6f18aaa122c23f87d989c30bba4e9aa24c8278912aac339a8d
 
-FROM ${NODE_VERSION} AS local-python
+FROM ${BASE_IMAGE} AS base
 
-# node-gyp depends on gcc, make and Python
+COPY [ "./apt.conf", "/etc/apt/" ]
+
+FROM ${BASE_IMAGE} AS nvm
+
+RUN \
+    apt-get update -qq \
+    && apt-get install -yqq \
+        binutils \
+        ca-certificates \
+        coreutils \
+        curl \
+        findutils \
+        g++ \
+        gcc \
+        grep \
+        libncurses5-dev \
+        libncursesw5-dev \
+        linux-headers-6.8.0-79-generic \
+        make \
+        openssl \
+        python3 \
+        util-linux \
+    && apt-get clean -qq
+
+# Installing NVM
+# https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-in-docker
+ENV NVM_DIR="/root/.nvm"
+ARG NVM_VERSION="v0.40.3"
+ARG NVM_HASH=sha256:2d8359a64a3cb07c02389ad88ceecd43f2fa469c06104f92f98df5b6f315275f
+ADD --checksum="${NVM_HASH}" --chmod="+x" [ \
+    "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh", \
+    "/tmp/" \
+]
+RUN \
+    '/tmp/install.sh' \
+    && rm '/tmp/install.sh'
+
+# Installing Node.js and NPM
+# Projected EOL of v24: Oct 2028
+# https://nodejs.org/en/download/releases
+SHELL [ "bash", "-c" ]
+ENV NODE_VERSION="24.8.0"
+RUN \
+    source "${NVM_DIR}/nvm.sh" \
+    && nvm install "${NODE_VERSION}" \
+    && nvm use "${NODE_VERSION}" \
+    && apt-get remove -yqq \
+        curl \
+        python3 \
+    && apt-get clean -qq
+
+ENTRYPOINT [ "bash", "-c", "source \"${NVM_DIR}/nvm.sh\" && exec \"$@\"", "--" ]
+CMD [ "tail", "-f", "/dev/null" ]
+
+FROM nvm AS local-python
+
+# node-gyp depends on gcc and make
 # Everything else is an optional/required dependency of Python
-RUN apt-get update -qq \
+RUN \
+    # deb-src is necessary for apt-get build-dep
+    sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get update -qq \
     # Shuts up interactive dependency installations
     && DEBIAN_FRONTEND=noninteractive apt-get install -yqq \
         tzdata \
@@ -22,7 +83,7 @@ RUN apt-get update -qq \
         liblzma-dev \
         libncurses5-dev \
         libreadline6-dev \
-        libreadline6-dev \
+        libsqlite3-dev \
         libssl-dev \
         libzstd-dev \
         lzma \
@@ -59,17 +120,17 @@ ENV PYTHON="/usr/local/bin/python3/python"
 
 FROM local-python AS example-service
 
-RUN npm i -g node-gyp
 WORKDIR /project/service/
-# 1000:1000 corresponds to user node
-COPY --chown=1000:1000 [ \
-    "./package.json", \
-    "./package-lock.json*", \
-    "./npm-shrinkwrap.json*", \
-    "./" \
-]
-RUN npm i
-COPY --link --chown=1000:1000 [ "./", "./" ]
+COPY [ "./package.json", "./package-lock.json*", "./npm-shrinkwrap.json*", "./" ]
+RUN \
+    source "${NVM_DIR}/nvm.sh" \
+    && npm i
 
-USER node
+ARG NODE_GYP_VERSION="^11.4.2"
+RUN \
+    source "${NVM_DIR}/nvm.sh" \
+    npm i -g "node-gyp@${NODE_GYP_VERSION}"
+
+COPY --link [ "./", "./" ]
+
 CMD [ "npm", "start" ]
